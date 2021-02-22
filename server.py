@@ -48,7 +48,7 @@ def run_hook():
         path = pathlib.PurePosixPath(change.path)
 
         # Delta Lake log files are allowed and skipped
-        if path.parent is not None \
+        if path.parent \
                 and path.parent.name == '_delta_log' \
                 and path.suffix in {'.json', '.parquet'}:
             continue  # We allow json files, but only for Delta logs
@@ -69,18 +69,13 @@ def run_hook():
             schema = orc_file.schema
 
         # read schema and ensure we don't expose any user fields
-        schema_errors = False
         for column in schema:
             if column.name.startswith('user_'):
                 errs.append({'path': change.path, 'error': f'column name not allowed: {column.name}'})
-                schema_errors = True
-                break
-        if schema_errors:
-            continue
 
     # Return a report back to lakeFS
-    code = 200
-    if len(errs) > 0:
+    if errs:
         code = 400  # Block this merge!
-
+    else:
+        code = 200
     return jsonify({'validation_errors': errs}), code

@@ -8,6 +8,7 @@ from bravado.client import SwaggerClient
 from bravado.exception import HTTPNotFound
 
 LISTING_PREFETCH_SIZE = 1000
+LAKEFS_TYPE_NAME = 'lakefs'
 
 
 def pyarrow_fs(client: SwaggerClient, repository: str, ref: str):
@@ -17,14 +18,14 @@ def pyarrow_fs(client: SwaggerClient, repository: str, ref: str):
     return PyFileSystem(LakeFSFileSystem(client, repository, ref))
 
 
-def get_file_info(path: str, ftype: FileType, size_bytes: int = 0, mtime_ts : int = 0) -> FileInfo:
+def get_file_info(path: str, file_type: FileType, size_bytes: int = 0, mtime_ts: int = 0) -> FileInfo:
     """
     Generate a pyarrow.FileInfo object for the given path metadata.
     Used to convert lakeFS statObject/listObjects responses to pyArrow's format
     """
     return FileInfo(
         path=path,
-        type=ftype,
+        type=file_type,
         size=size_bytes,
         mtime=datetime.datetime.fromtimestamp(mtime_ts),
     )
@@ -51,12 +52,10 @@ class LakeFSFileSystem(FileSystemHandler):
     >>>         raise ValueError('user identifying columns are not allowed!')
     >>>
     >>> # read a dataset and explore the data
-    >>> dataset = pq.ParquetDataset('collections/events/', filesystem=c.filesystem('my-repo-name', 'my-branch'))
+    >>> dataset = pq.ParquetDataset('collections/events/', filesystem=client.filesystem('my-repo-name', 'my-branch'))
     >>> table = dataset.read_pandas()
     >>> assert len(table) > 50000
     """
-
-    type_name = 'lakefs'
 
     def __init__(self, client: SwaggerClient, repository: str, ref: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -120,13 +119,14 @@ class LakeFSFileSystem(FileSystemHandler):
         return entries
 
     def get_type_name(self, *args, **kwargs):
-        return self.type_name
+        return LAKEFS_TYPE_NAME
 
     def _get_file_info(self, path) -> FileInfo:
         if path.endswith('/'):
             # Check it exists
-            if len(list(self._list_entries(path, max_amount=1))) == 0:
-                return get_file_info(path, FileType.NotFound)  # this doesn't exist!
+            if next(self._list_entries(path, max_amount=1), None):
+                # this doesn't exist!
+                return get_file_info(path, FileType.NotFound)
             return get_file_info(path, FileType.Directory)
         # get file
         try:
@@ -139,8 +139,10 @@ class LakeFSFileSystem(FileSystemHandler):
         return get_file_info(path, FileType.File, response.result.size_bytes, response.result.mtime)
 
     def _list_entries(self, path: str, delimiter: str = '/', max_amount: int = None):
+        if not max_amount or max_amount == 0:
+            return
         after = ''
-        yielded = 0
+        amount = 0
         while True:
             response = self._client.objects.listObjects(
                 repository=self.repository,
@@ -162,8 +164,8 @@ class LakeFSFileSystem(FileSystemHandler):
                         result.path,
                         FileType.Directory,
                     )
-                yielded += 1
-                if max_amount is not None and yielded >= max_amount:
+                amount += 1
+                if max_amount and amount >= max_amount:
                     return
             if not response.get('pagination').has_more:
                 return  # no more things.
