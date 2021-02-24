@@ -129,11 +129,11 @@ on:
     branches:
       - *
 hooks:
-  - id: production_ensure_commit_tags
+  - id: production_ensure_commit_metadata
     type: webhook
     description: Check all commits that write to production/ for mandatory metadata fields
     properties:
-      url: "http://<host:port>/webhooks/commit_tags"
+      url: "http://<host:port>/webhooks/commit_metadata"
       query_params:
         prefix: production/
         fields: [owning_team, job_id, job_git_commit, sla, airflow_dag_url]

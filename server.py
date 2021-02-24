@@ -143,13 +143,13 @@ def webhook_dirty_check():
     return jsonify({'errors': errors}), 200 if not errors else 400
 
 
-@app.route('/webhooks/commit_tags')
-def webhook_commit_tags():
+@app.route('/webhooks/commit_metadata')
+def webhook_commit_metadata():
     """
     This is a pre-commit webhook that ensures commits that write to a given path also contain
-        a certain set of tags.
+        a certain set of metadata fields.
     Example lakeFS hook URL:
-        http://<host:port>/webhooks/commit_tags?prefix=data/daily/&fields=job_id&fields=owning_team
+        http://<host:port>/webhooks/commit_metadata?prefix=data/daily/&fields=job_id&fields=owning_team
     """
     # Set-up a lakeFS client
     client = lakefs.Client(LAKEFS_SERVER_ADDRESS, LAKEFS_ACCESS_KEY_ID, LAKEFS_SECRET_ACCESS_KEY)
