@@ -120,7 +120,10 @@ Example usage as a pre-commit hook in lakeFS:
 ```yaml
 ---
 name: EnsureProductionCommitMetadata
-description: Check commits that write to production/ that they contain a set of mandatory metadata fields
+description: >-
+  Check commits that write to production/ that 
+  they contain a set of mandatory metadata fields.
+  These fields must not be empty.
 on:
   pre-commit:
     branches:
