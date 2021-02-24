@@ -9,3 +9,7 @@ def is_delta_lake(path: Path) -> bool:
 def has_extension(extension: str):
     def _validation(path: Path) -> bool:
         return path.extension.lower() == extension
+
+
+def is_hadoop_hidden(path: Path) -> bool:
+    return path.base_name.startswith('_')

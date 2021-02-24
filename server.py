@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from typing import Any, Tuple, Iterator
-
 import lakefs
 from lakefs.path import Path
 from lakefs import formats
@@ -19,7 +17,8 @@ app = Flask(__name__)
 def webhook_formats():
     """
     A (very) simple webhook that validates all merged files are of a certain format
-    Example lakeFS hook URL: http://<host:port>/webhooks/format?allow=parquet&allow=delta_lake&prefix=production/tables/
+    Example lakeFS hook URL:
+        http://<host:port>/webhooks/format?allow=parquet&allow=delta_lake&prefix=production/tables/
     """
     format_validators = {
         'delta_lake': lakefs.formats.is_delta_lake,
@@ -43,8 +42,11 @@ def webhook_formats():
     errors = []
     for change in client.diff(repo, from_ref, target_branch, prefix=prefix):
         # we only care about new and overwritten files
-        if change.type not in ('added', 'changed'):
+        if change.type != 'added':
             continue
+
+        if lakefs.formats.is_hadoop_hidden(Path(change.path)):
+            continue  # let's skip hidden files
 
         if not any([fn(Path(change.path)) for fn in validation_funcs]):
             errors.append({'path': change.path, 'error': 'file format not allowed'})
@@ -56,7 +58,8 @@ def webhook_formats():
 def webhook_schema():
     """
     A simple schema validation webhook to disallow certain field names under a given path
-    Example lakeFS hook URL: http://<host:port>/webhooks/schema?disallow=user_&disallow=private_&prefix=public/
+    Example lakeFS hook URL:
+        http://<host:port>/webhooks/schema?disallow=user_&disallow=private_&prefix=public/
     """
     # Set-up a lakeFS client
     client = lakefs.Client(LAKEFS_SERVER_ADDRESS, LAKEFS_ACCESS_KEY_ID, LAKEFS_SECRET_ACCESS_KEY)
@@ -103,7 +106,8 @@ def webhook_dirty_check():
     This webhook validates that merged change only creates a new directory, or replaces all objects within it.
     This is useful for immutable tables (or partitions) that are only ever calculated in their fullest, so any situation
         where data files are partially added or replaced, is treated as an error
-    Example lakeFS hook URL: http://<host:port>/webhooks/dirty_check?prefix=hive/tables/
+    Example lakeFS hook URL:
+        http://<host:port>/webhooks/dirty_check?prefix=hive/tables/
     """
     # Set-up a lakeFS client
     client = lakefs.Client(LAKEFS_SERVER_ADDRESS, LAKEFS_ACCESS_KEY_ID, LAKEFS_SECRET_ACCESS_KEY)
@@ -144,7 +148,8 @@ def webhook_commit_tags():
     """
     This is a pre-commit webhook that ensures commits that write to a given path also contain
         a certain set of tags.
-    Example lakeFS hook URL: http://<host:port>/webhooks/commit_tags?prefix=data/daily/&tag=job_id&tag=owning_team
+    Example lakeFS hook URL:
+        http://<host:port>/webhooks/commit_tags?prefix=data/daily/&fields=job_id&fields=owning_team
     """
     # Set-up a lakeFS client
     client = lakefs.Client(LAKEFS_SERVER_ADDRESS, LAKEFS_ACCESS_KEY_ID, LAKEFS_SECRET_ACCESS_KEY)
@@ -153,22 +158,22 @@ def webhook_commit_tags():
     event = request.get_json()
     repo = event.get('repository_id')
     from_ref = event.get('source_ref')
-    commit_tags = event.get('metadata', {})
+    commit_metadata_fields = event.get('metadata', {})
 
     # read request params
     prefix = request.args.get('prefix', '')
-    tags = request.args.getlist('tag')
+    fields = request.args.getlist('fields')
 
     errors = []
     has_changes_in_prefix = bool(list(client.diff_branch(repo, from_ref, prefix=prefix, max_amount=1)))
     if not has_changes_in_prefix:
         return jsonify({'errors': errors}), 200
 
-    for tag in tags:
-        if tag not in commit_tags:
-            errors.append({'path': prefix, 'error': f'missing commit tag: {tag}'})
+    for field in fields:
+        if fields not in commit_metadata_fields:
+            errors.append({'path': prefix, 'error': f'missing commit metadata field: {field}'})
             continue
-        if not commit_tags.get(tag):
-            errors.append({'path': prefix, 'error': f'commit tag is empty: {tag}'})
+        if not commit_metadata_fields.get(field):
+            errors.append({'path': prefix, 'error': f'commit metadata field is empty: {field}'})
 
     return jsonify({'errors': errors}), 200 if not errors else 400
