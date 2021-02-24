@@ -64,7 +64,9 @@ Example usage as a pre-merge hook in lakeFS:
 ```yaml
 ---
 name: NoUserColumnsUnderPub
-description: This webhook ensures that files with columns beginning with user_ can't be written to public/ 
+description: >-
+  This webhook ensures that files with columns 
+  beginning with "user_" can't be written to public/ 
 on:
   pre-merge:
     branches:
