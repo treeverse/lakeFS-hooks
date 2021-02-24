@@ -4,14 +4,14 @@ from typing import Union, Tuple
 from pyarrow import NativeFile, BufferReader
 from pyarrow.fs import PyFileSystem, FileInfo, FileType, FileSystemHandler, FileSelector
 
-from bravado.client import SwaggerClient
 from bravado.exception import HTTPNotFound
 
-LISTING_PREFETCH_SIZE = 1000
+from lakefs import Client
+
 LAKEFS_TYPE_NAME = 'lakefs'
 
 
-def pyarrow_fs(client: SwaggerClient, repository: str, ref: str):
+def pyarrow_fs(client: Client, repository: str, ref: str):
     """
     A wrapper that returns a pyarrow.fs.PyFileSystem from the LakeFSFileSystem implementation.
     """
@@ -43,7 +43,7 @@ class LakeFSFileSystem(FileSystemHandler):
     >>> import pyarrow.parquet as pq
     >>>
     >>> client = lakefs.Client('http://localhost:8000', '<lakeFS access key ID>', '<lakeFS secret key>')
-    >>> fs = client.filesystem('my-repo-name', 'my-branch')
+    >>> fs = lakefs.get_filesystem(client, 'my-repo-name', 'my-branch')
     >>>
     >>> # Do some schema validation
     >>> schema = pq.read_schema(fs.open_input_file('some_file.parquet'))
@@ -57,7 +57,7 @@ class LakeFSFileSystem(FileSystemHandler):
     >>> assert len(table) > 50000
     """
 
-    def __init__(self, client: SwaggerClient, repository: str, ref: str, *args, **kwargs):
+    def __init__(self, client: Client, repository: str, ref: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._client = client
         self.repository = repository
@@ -93,11 +93,8 @@ class LakeFSFileSystem(FileSystemHandler):
         pass
 
     def open_input_file(self, source: str, compression: str = 'detect', buffer_size: int = None) -> NativeFile:
-        response = self._client.objects.getObject(
-            repository=self.repository,
-            ref=self.ref,
-            path=source).response()
-        return BufferReader(response.result)
+        obj = self._client.get_object(self.repository, self.ref, source)
+        return BufferReader(obj)
 
     def open_input_stream(self, source: str, compression: str = 'detect', buffer_size: int = None):
         pass
@@ -130,43 +127,14 @@ class LakeFSFileSystem(FileSystemHandler):
             return get_file_info(path, FileType.Directory)
         # get file
         try:
-            response = self._client.objects.statObject(
-                repository=self.repository,
-                ref=self.ref,
-                path=path).response()
+            stat = self._client.stat_object(repository=self.repository, ref=self.ref, path=path)
         except HTTPNotFound:
             return get_file_info(path, FileType.NotFound)  # this doesn't exist!
-        return get_file_info(path, FileType.File, response.result.size_bytes, response.result.mtime)
+        return get_file_info(path, FileType.File, stat.size_bytes, stat.mtime)
 
     def _list_entries(self, path: str, delimiter: str = '/', max_amount: int = None):
-        if not max_amount or max_amount == 0:
-            return
-        after = ''
-        amount = 0
-        while True:
-            response = self._client.objects.listObjects(
-                repository=self.repository,
-                ref=self.ref,
-                prefix=path,
-                after=after,
-                delimiter=delimiter,
-                amount=LISTING_PREFETCH_SIZE).response().result
-            for result in response.get('results'):
-                if result.path_type == 'object':
-                    yield get_file_info(
-                        result.path,
-                        FileType.File,
-                        result.size_bytes,
-                        result.mtime,
-                    )
-                else:
-                    yield get_file_info(
-                        result.path,
-                        FileType.Directory,
-                    )
-                amount += 1
-                if max_amount and amount >= max_amount:
-                    return
-            if not response.get('pagination').has_more:
-                return  # no more things.
-            after = response.get('pagination').next_offset
+        for result in self._client.list(self.repository, self.ref, path, delimiter, max_amount):
+            if result.path_type == 'object':
+                yield get_file_info(result.path, FileType.File, result.size_bytes, result.mtime)
+            else:
+                yield get_file_info(result.path, FileType.Directory)
