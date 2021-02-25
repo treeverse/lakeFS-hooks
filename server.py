@@ -8,9 +8,14 @@ from settings import LAKEFS_ACCESS_KEY_ID, LAKEFS_SECRET_ACCESS_KEY, LAKEFS_SERV
 import pyarrow.orc
 import pyarrow.parquet
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 
 app = Flask(__name__)
+
+
+@app.route('/', methods=['GET'])
+def index():
+    return send_file('README.md')
 
 
 @app.route('/webhooks/format', methods=['POST'])
@@ -22,8 +27,6 @@ def webhook_formats():
     """
     format_validators = {
         'delta_lake': lakefs.formats.is_delta_lake,
-        'parquet': lakefs.formats.has_extension('parquet'),
-        'orc': lakefs.formats.has_extension('orc'),
     }
 
     # Set-up a lakeFS client
@@ -37,7 +40,7 @@ def webhook_formats():
 
     prefix = request.args.get('prefix')
     allowed_formats = request.args.getlist('allow')
-    validation_funcs = [format_validators.get(f) for f in allowed_formats]
+    validation_funcs = [format_validators.get(f, lakefs.formats.has_extension(f)) for f in allowed_formats]
 
     errors = []
     for change in client.diff(repo, from_ref, target_branch, prefix=prefix):
@@ -48,7 +51,9 @@ def webhook_formats():
         if lakefs.formats.is_hadoop_hidden(Path(change.path)):
             continue  # let's skip hidden files
 
-        if not any([fn(Path(change.path)) for fn in validation_funcs]):
+        p = Path(change.path)
+        validation = map(lambda f: f(p), validation_funcs)
+        if not any(validation):
             errors.append({'path': change.path, 'error': 'file format not allowed'})
 
     return jsonify({'errors': errors}), 200 if not errors else 400
@@ -94,7 +99,7 @@ def webhook_schema():
 
         # read schema and ensure we don't expose any user fields
         for column in schema:
-            if any([lambda: column.name.startswith(prefix) for prefix in disallowed_prefixes]):
+            if any([column.name.startswith(prefix) for prefix in disallowed_prefixes]):
                 errors.append({'path': change.path, 'error': f'column name not allowed: {column.name}'})
 
     return jsonify({'errors': errors}), 200 if not errors else 400
@@ -121,7 +126,7 @@ def webhook_dirty_check():
     prefix = request.args.get('prefix')
 
     modified_dirs = []
-    for change in client.diff(repo, from_ref, target_branch, prefix=prefix):
+    for change in client.diff_branch(repo, target_branch, prefix=prefix):
         dir_name = Path(change.path).dir_name + '/'
         if change.type not in ('added', 'changed'):
             continue  # We only care about directories that had files changed or added
@@ -131,19 +136,20 @@ def webhook_dirty_check():
     # now we have an ordered list of directories that were modified under prefix
     errors = []
     for dir_name in modified_dirs:
-        # either we removed all the stuff in the diff, or this is dirty
-        objects = list(client.list(repo, target_branch, path=dir_name))  # could be made efficient if needed
-        removals = filter(lambda c: c.type == 'removed', client.diff(repo, from_ref, target_branch, prefix=dir_name))
-        remaining = filter(lambda o: o.path in map(lambda r: r.path, removals), objects)
-        # we ignore empty files like _SUCCESS
-        dirty = filter(lambda o: o.size > 0, remaining)
-        for obj in dirty:
-            errors.append({'path': obj.path, 'error': 'object is dirty'})
+        before = client.list(repo, client.get_last_commit(repo, from_ref), path=dir_name)
+        after = client.list(repo, from_ref, path=dir_name)
+        previous_data_files = set([obj.path for obj in before if obj.path_type == 'object' and obj.size_bytes > 0])
+        current_data_files = [obj for obj in after if obj.path_type == 'object' and obj.size_bytes > 0]
+        dirty_files = [o for o in current_data_files if o.path in previous_data_files]
+        if len(dirty_files) == len(current_data_files):
+            continue  # if all current files are "dirty", there wasn't a modification at all.
+        for dirty_file in dirty_files:
+            errors.append({'path': dirty_file.path, 'error': 'object is dirty'})
 
     return jsonify({'errors': errors}), 200 if not errors else 400
 
 
-@app.route('/webhooks/commit_metadata')
+@app.route('/webhooks/commit_metadata', methods=['POST'])
 def webhook_commit_metadata():
     """
     This is a pre-commit webhook that ensures commits that write to a given path also contain
@@ -158,7 +164,7 @@ def webhook_commit_metadata():
     event = request.get_json()
     repo = event.get('repository_id')
     from_ref = event.get('source_ref')
-    commit_metadata_fields = event.get('metadata', {})
+    commit_metadata_fields = event.get('commit_metadata', {})
 
     # read request params
     prefix = request.args.get('prefix', '')
@@ -170,7 +176,7 @@ def webhook_commit_metadata():
         return jsonify({'errors': errors}), 200
 
     for field in fields:
-        if fields not in commit_metadata_fields:
+        if field not in commit_metadata_fields:
             errors.append({'path': prefix, 'error': f'missing commit metadata field: {field}'})
             continue
         if not commit_metadata_fields.get(field):

@@ -50,7 +50,7 @@ hooks:
     properties:
       url: "http://<host:port>/webhooks/format"
       query_params:
-        allow: [parquet, delta_lake]
+        allow: ["parquet", "delta_lake"]
         prefix: production/
 ```
 
@@ -74,7 +74,7 @@ on:
 hooks:
   - id: pub_prevent_user_columns
     type: webhook
-    description: Ensure no user_* under public/
+    description: Ensure no user_* columns under public/
     properties:
       url: "http://<host:port>/webhooks/schema"
       query_params:
@@ -100,7 +100,7 @@ description: Check all partitions remain immutable under tables/hive/
 on:
   pre-commit:
     branches:
-      - *
+      - "*"
 hooks:
   - id: hive_ensure_immutable
     type: webhook
@@ -127,7 +127,7 @@ description: >-
 on:
   pre-commit:
     branches:
-      - *
+      - "*"
 hooks:
   - id: production_ensure_commit_metadata
     type: webhook
@@ -136,7 +136,7 @@ hooks:
       url: "http://<host:port>/webhooks/commit_metadata"
       query_params:
         prefix: production/
-        fields: [owning_team, job_id, job_git_commit, sla, airflow_dag_url]
+        fields: [airflow_dag_run_url, job_git_commit, update_sla, sources]
 ```
 
 
@@ -184,7 +184,7 @@ curl -v -XPOST -H 'Content-Type: application/json' \
        "source_ref": "220158b4b316e536e024aaaaf76b2377a6c71dfd6b974ca3a49354a9bdd0dbc3",
        "commit_message": "a commit message",
        "committer": "user1"
-  }' 'http://localhost:5000/'
+  }' 'http://localhost:5000/webhooks/schema'
 ```
 
 

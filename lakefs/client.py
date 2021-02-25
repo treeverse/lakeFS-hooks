@@ -43,6 +43,12 @@ class Client(object):
             http_client=self._http_client,
             config={"validate_swagger_spec": False})
 
+    def get_last_commit(self, repository: str, branch: str) -> str:
+        response = self._client.branches.getBranch(
+            repository=repository,
+            branch=branch).response()
+        return response.result.commit_id
+
     def diff_branch(self, repository: str, branch: str, prefix: str = '',
                     prefetch_amount: int = PREFETCH_CURSOR_SIZE,
                     max_amount: int = None) -> Iterator[namedtuple]:
@@ -86,8 +92,6 @@ class Client(object):
             after = response.get('pagination').next_offset
 
     def list(self, repository: str, ref: str, path: str, delimiter: str = '/', max_amount: int = None):
-        if not max_amount or max_amount == 0:
-            return
         after = ''
         amount = 0
         while True:
@@ -101,7 +105,7 @@ class Client(object):
             for result in response.get('results'):
                 yield result
                 amount += 1
-                if max_amount and amount >= max_amount:
+                if max_amount is not None and amount >= max_amount:
                     return
             if not response.get('pagination').has_more:
                 return  # no more things.
