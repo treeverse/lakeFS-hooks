@@ -103,7 +103,7 @@ on:
 hooks:
   - id: hive_ensure_immutable
     type: webhook
-    description: Check all hive partitions are either full written or fully replaced
+    description: Check all hive partitions are either fully written or fully replaced
     properties:
       url: "http://<host:port>/webhooks/dirty_check"
       query_params:
