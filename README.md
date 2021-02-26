@@ -1,10 +1,8 @@
-# lakeFS-Flask-Webhook
+# lakeFS-hooks
 
 This repository provides a set of simple [lakeFS](https://www.lakefs.io/) webhooks for pre-commit and pre-merge validation of data objects.
 
 By setting these rules, a lakeFS-based data lake can ensure that production branches only ever contain valid, quality data - but still allows others to experiment with untested version on isolated branches.
-
-This repository is meant to be forked and adapted to do actual useful validation (see the `run_hook` function in server.py for the actual validation logic)
 
 ## Table of Contents
 
@@ -56,7 +54,7 @@ hooks:
 
 #### Basic File Schema Validator
 
-This webhook Parquet and ORC files to ensure they don't contain a black list of column names (or name prefixes).
+This webhook reads new Parquet and ORC files to ensure they don't contain a block list of column names (or name prefixes).
 This is useful when we want to avoid accidental PII exposure.
 
 Example usage as a pre-merge hook in lakeFS:
@@ -89,7 +87,8 @@ This means we allow writing to a directory only if:
    - we overwrite all the files in it
    - we add files but also delete all previous content
 
-In this case, if files were added or replaced, but some previous content remains, we consider it "dirty" and fail the commit
+In this case, if files were added or replaced, but some previous content remains, we consider it "dirty" and fail the commit.
+This check is smart enough to disregard empty files. 
 
 Example usage as a pre-commit hook in lakeFS:
 
@@ -145,8 +144,8 @@ hooks:
 To get started, clone this repo locally, as you might also want to modify it to your needs:
 
 ```sh
-$ git clone git@github.com:treeverse/lakeFS-Flask-Webhook.git
-$ cd lakeFS-Flask-Webhook/
+$ git clone ttps://github.com/treeverse/lakeFS-hooks.git
+$ cd lakeFS-hooks/
 # edit server.py
 ```
 
@@ -200,7 +199,7 @@ $ docker run \
     -e LAKEFS_ACCESS_KEY_ID='<access key ID of a lakeFS user>' \
     -e LAKEFS_SECRET_ACCESS_KEY='<secret access key for the give key ID>' \
     -p 5000:5000 \
-    lakefs-hooks:latest
+    lakefs-hooks
 ```
 
 ## Support

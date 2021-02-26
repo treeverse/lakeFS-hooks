@@ -1,8 +1,9 @@
 
 
-class Path(object):
-    DEFAULT_PATH_SEPARATOR = '/'
-    DEFAULT_EXTENSION_SEPARATOR = '.'
+DEFAULT_PATH_SEPARATOR = '/'
+DEFAULT_EXTENSION_SEPARATOR = '.'
+
+class Path:
 
     def __init__(self, v: str, separator: str = DEFAULT_PATH_SEPARATOR):
         self.path = v
@@ -20,6 +21,6 @@ class Path(object):
         return prefix if sep == self.separator else ''
 
     @property
-    def extension(self, ext_separator: str = DEFAULT_EXTENSION_SEPARATOR):
-        _, sep, ext = self.base_name.rpartition(ext_separator)
-        return ext if sep == ext_separator else ''
+    def extension(self):
+        _, sep, ext = self.base_name.rpartition(DEFAULT_EXTENSION_SEPARATOR)
+        return ext if sep == DEFAULT_EXTENSION_SEPARATOR else ''

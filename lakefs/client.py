@@ -12,10 +12,12 @@ from pyarrow.fs import PyFileSystem, FileInfo, FileType, FileSystemHandler, File
 
 
 # Determines how many objects to fetch on each diff/list iteration from the lakeFS API.
+from lakefs.path import DEFAULT_PATH_SEPARATOR
+
 PREFETCH_CURSOR_SIZE = 1000
 
 
-class Client(object):
+class Client:
     """
     Client is a lakeFS OpenAPI client, generated dynamically using Bravado.
     To instantiate a new client, it must have access to a running lakeFS server.
@@ -91,7 +93,7 @@ class Client(object):
                 return  # no more things.
             after = response.get('pagination').next_offset
 
-    def list(self, repository: str, ref: str, path: str, delimiter: str = '/', max_amount: int = None):
+    def list(self, repository: str, ref: str, path: str, delimiter: str = DEFAULT_PATH_SEPARATOR, max_amount: int = None):
         after = ''
         amount = 0
         while True:
@@ -229,7 +231,7 @@ class LakeFSFileSystem(FileSystemHandler):
         pass
 
     def get_file_info_selector(self, selector: Union[FileSelector, str, Tuple[str]]):
-        delimiter = '/'
+        delimiter = DEFAULT_PATH_SEPARATOR
         path = selector
         if isinstance(selector, FileSelector):
             path = selector.base_dir
@@ -242,7 +244,7 @@ class LakeFSFileSystem(FileSystemHandler):
         return LAKEFS_TYPE_NAME
 
     def _get_file_info(self, path) -> FileInfo:
-        if path.endswith('/'):
+        if path.endswith(DEFAULT_PATH_SEPARATOR):
             # Check it exists
             if next(self._list_entries(path, max_amount=1), None):
                 # this doesn't exist!
@@ -255,7 +257,7 @@ class LakeFSFileSystem(FileSystemHandler):
             return get_file_info(path, FileType.NotFound)  # this doesn't exist!
         return get_file_info(path, FileType.File, stat.size_bytes, stat.mtime)
 
-    def _list_entries(self, path: str, delimiter: str = '/', max_amount: int = None):
+    def _list_entries(self, path: str, delimiter: str = DEFAULT_PATH_SEPARATOR, max_amount: int = None):
         for result in self._client.list(self.repository, self.ref, path, delimiter, max_amount):
             if result.path_type == 'object':
                 yield get_file_info(result.path, FileType.File, result.size_bytes, result.mtime)
