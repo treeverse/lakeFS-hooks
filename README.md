@@ -144,7 +144,7 @@ hooks:
 To get started, clone this repo locally, as you might also want to modify it to your needs:
 
 ```sh
-$ git clone ttps://github.com/treeverse/lakeFS-hooks.git
+$ git clone https://github.com/treeverse/lakeFS-hooks.git
 $ cd lakeFS-hooks/
 # edit server.py
 ```
@@ -216,4 +216,3 @@ Stay up to date and get lakeFS support via:
 - [Twitter](https://twitter.com/lakeFS) (follow for updates and news)
 - [YouTube](https://www.youtube.com/channel/UCZiDUd28ex47BTLuehb1qSA) (learn from video tutorials)
 - [Contact us](https://lakefs.io/contact-us/) (for anything)
-
