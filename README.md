@@ -216,3 +216,9 @@ Stay up to date and get lakeFS support via:
 - [Twitter](https://twitter.com/lakeFS) (follow for updates and news)
 - [YouTube](https://www.youtube.com/channel/UCZiDUd28ex47BTLuehb1qSA) (learn from video tutorials)
 - [Contact us](https://lakefs.io/contact-us/) (for anything)
+
+## Licensing
+
+lakeFS-hooks is completely free and open source and licensed under the [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0).
+
+
