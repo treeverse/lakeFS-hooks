@@ -110,7 +110,7 @@ hooks:
         prefix: tables/hive/
 ```
 
-#### Commit Tag Validator
+#### Commit Metadata Validator
 
 In production, we want to ensure commits carry enough metadata to be useful for lineage and traceability.
 
