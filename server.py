@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
-import lakefs
-from lakefs.path import Path
-from lakefs import formats
-
-from settings import LAKEFS_ACCESS_KEY_ID, LAKEFS_SECRET_ACCESS_KEY, LAKEFS_SERVER_ADDRESS
-
 import pyarrow.orc
 import pyarrow.parquet
-
 from flask import Flask, request, jsonify, send_file
+import lakefs
+from lakefs.path import Path
+from settings import LAKEFS_ACCESS_KEY_ID, LAKEFS_SECRET_ACCESS_KEY, LAKEFS_SERVER_ADDRESS
 
 app = Flask(__name__)
 

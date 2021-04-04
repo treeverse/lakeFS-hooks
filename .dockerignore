@@ -10,3 +10,5 @@ pip-delete-this-directory.txt
 .cache
 *.log
 .git
+/oapi-client.zip
+/oapi-client/
