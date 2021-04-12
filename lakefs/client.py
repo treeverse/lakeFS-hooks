@@ -3,9 +3,7 @@ from collections import namedtuple
 from typing import Iterator, Union, Tuple
 
 import lakefs_client
-from lakefs_client.api import branches_api
-from lakefs_client.api import refs_api
-from lakefs_client.api import objects_api
+from lakefs_client.client import LakeFSClient
 from lakefs_client.exceptions import NotFoundException
 
 from pyarrow import NativeFile, BufferReader
@@ -37,23 +35,21 @@ class Client:
 
     def __init__(self, base_url: str, access_key: str, secret_key: str):
         configuration = lakefs_client.Configuration(host=base_url, username=access_key, password=secret_key)
-        self._client = lakefs_client.ApiClient(configuration)
+        self._client = LakeFSClient(configuration)
 
     def get_last_commit(self, repository: str, branch: str) -> str:
-        api = branches_api.BranchesApi(self._client)
-        response = api.get_branch(repository=repository, branch=branch)
+        response = self._client.branches.get_branch(repository=repository, branch=branch)
         return response.commit_id
 
     def diff_branch(self, repository: str, branch: str, prefix: str = '',
                     prefetch_amount: int = PREFETCH_CURSOR_SIZE,
                     max_amount: int = None) -> Iterator[namedtuple]:
-        api = branches_api.BranchesApi(self._client)
         after = prefix
         amount = 0
         if max_amount is not None:
             prefetch_amount = min(prefetch_amount, max_amount)
         while True:
-            response = api.diff_branch(
+            response = self._client.branches.diff_branch(
                 repository=repository,
                 branch=branch,
                 after=after,
@@ -71,10 +67,9 @@ class Client:
 
     def diff(self, repository: str, from_ref: str, to_ref: str, prefix: str = '',
              prefetch_amount: int = PREFETCH_CURSOR_SIZE) -> Iterator[namedtuple]:
-        api = refs_api.RefsApi(self._client)
         after = prefix
         while True:
-            response = api.diff_refs(
+            response = self._client.refs.diff_refs(
                 repository=repository,
                 left_ref=from_ref,
                 right_ref=to_ref,
@@ -90,11 +85,10 @@ class Client:
 
     def list(self, repository: str, ref: str, path: str, delimiter: str = DEFAULT_PATH_SEPARATOR,
              max_amount: int = None):
-        api = objects_api.ObjectsApi(self._client)
         after = ''
         amount = 0
         while True:
-            response = api.list_objects(
+            response = self._client.objects.list_objects(
                 repository=repository,
                 ref=ref,
                 prefix=path,
@@ -111,16 +105,14 @@ class Client:
             after = response.pagination.next_offset
 
     def get_object(self, repository: str, ref: str, path: str):
-        api = objects_api.ObjectsApi(self._client)
-        response = api.get_object(
+        response = self._client.objects.get_object(
             repository=repository,
             ref=ref,
             path=path)
         return response
 
     def stat_object(self, repository: str, ref: str, path: str):
-        api = objects_api.ObjectsApi(self._client)
-        response = api.stat_object(
+        response = self._client.objects.stat_object(
             repository=repository,
             ref=ref,
             path=path)
