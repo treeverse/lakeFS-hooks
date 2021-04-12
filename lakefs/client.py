@@ -105,18 +105,16 @@ class Client:
             after = response.pagination.next_offset
 
     def get_object(self, repository: str, ref: str, path: str):
-        response = self._client.objects.get_object(
+        return self._client.objects.get_object(
             repository=repository,
             ref=ref,
             path=path)
-        return response
 
     def stat_object(self, repository: str, ref: str, path: str):
-        response = self._client.objects.stat_object(
+        return self._client.objects.stat_object(
             repository=repository,
             ref=ref,
             path=path)
-        return response
 
 
 def get_filesystem(client: Client, repository: str, ref: str) -> PyFileSystem:
