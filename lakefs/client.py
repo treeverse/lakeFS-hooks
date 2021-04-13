@@ -1,17 +1,14 @@
 import datetime
 from collections import namedtuple
 from typing import Iterator, Union, Tuple
-from urllib.parse import urlparse
 
-from bravado.requests_client import RequestsClient
-from bravado.client import SwaggerClient
-from bravado.exception import HTTPNotFound
+import lakefs_client
+from lakefs_client.client import LakeFSClient
+from lakefs_client.exceptions import NotFoundException
 
 from pyarrow import NativeFile, BufferReader
 from pyarrow.fs import PyFileSystem, FileInfo, FileType, FileSystemHandler, FileSelector
 
-
-# Determines how many objects to fetch on each diff/list iteration from the lakeFS API.
 from lakefs.path import DEFAULT_PATH_SEPARATOR
 
 PREFETCH_CURSOR_SIZE = 1000
@@ -37,19 +34,12 @@ class Client:
     """
 
     def __init__(self, base_url: str, access_key: str, secret_key: str):
-        url = urlparse(base_url)
-        self._http_client = RequestsClient()
-        self._http_client.set_basic_auth(url.netloc, access_key, secret_key)
-        self._client = SwaggerClient.from_url(
-            f'{base_url}/swagger.json',
-            http_client=self._http_client,
-            config={"validate_swagger_spec": False})
+        configuration = lakefs_client.Configuration(host=base_url, username=access_key, password=secret_key)
+        self._client = LakeFSClient(configuration)
 
     def get_last_commit(self, repository: str, branch: str) -> str:
-        response = self._client.branches.getBranch(
-            repository=repository,
-            branch=branch).response()
-        return response.result.commit_id
+        response = self._client.branches.get_branch(repository=repository, branch=branch)
+        return response.commit_id
 
     def diff_branch(self, repository: str, branch: str, prefix: str = '',
                     prefetch_amount: int = PREFETCH_CURSOR_SIZE,
@@ -59,78 +49,76 @@ class Client:
         if max_amount is not None:
             prefetch_amount = min(prefetch_amount, max_amount)
         while True:
-            response = self._client.branches.diffBranch(
+            response = self._client.branches.diff_branch(
                 repository=repository,
                 branch=branch,
                 after=after,
-                amount=prefetch_amount).response().result
-            for change in response.get('results'):
+                amount=prefetch_amount)
+            for change in response.results:
                 if not change.path.startswith(prefix):
                     return  # we're done since path > prefix
                 yield change
                 amount += 1
                 if max_amount is not None and amount >= max_amount:
                     return
-            if not response.get('pagination').has_more:
+            if not response.pagination.has_more:
                 return  # no more things.
-            after = response.get('pagination').next_offset
+            after = response.pagination.next_offset
 
     def diff(self, repository: str, from_ref: str, to_ref: str, prefix: str = '',
              prefetch_amount: int = PREFETCH_CURSOR_SIZE) -> Iterator[namedtuple]:
         after = prefix
         while True:
-            response = self._client.refs.diffRefs(
+            response = self._client.refs.diff_refs(
                 repository=repository,
-                leftRef=from_ref,
-                rightRef=to_ref,
+                left_ref=from_ref,
+                right_ref=to_ref,
                 after=after,
-                amount=prefetch_amount).response().result
-            for change in response.get('results'):
+                amount=prefetch_amount)
+            for change in response.results:
                 if not change.path.startswith(prefix):
                     return  # we're done since path > prefix
                 yield change
-            if not response.get('pagination').has_more:
+            if not response.pagination.has_more:
                 return  # no more things.
-            after = response.get('pagination').next_offset
+            after = response.pagination.next_offset
 
-    def list(self, repository: str, ref: str, path: str, delimiter: str = DEFAULT_PATH_SEPARATOR, max_amount: int = None):
+    def list(self, repository: str, ref: str, path: str, delimiter: str = DEFAULT_PATH_SEPARATOR,
+             max_amount: int = None):
         after = ''
         amount = 0
         while True:
-            response = self._client.objects.listObjects(
+            response = self._client.objects.list_objects(
                 repository=repository,
                 ref=ref,
                 prefix=path,
                 after=after,
                 delimiter=delimiter,
-                amount=PREFETCH_CURSOR_SIZE).response().result
-            for result in response.get('results'):
+                amount=PREFETCH_CURSOR_SIZE)
+            for result in response.results:
                 yield result
                 amount += 1
                 if max_amount is not None and amount >= max_amount:
                     return
-            if not response.get('pagination').has_more:
+            if not response.pagination.has_more:
                 return  # no more things.
-            after = response.get('pagination').next_offset
+            after = response.pagination.next_offset
 
     def get_object(self, repository: str, ref: str, path: str):
-        response = self._client.objects.getObject(
+        return self._client.objects.get_object(
             repository=repository,
             ref=ref,
-            path=path).response()
-        return response.result
+            path=path)
 
     def stat_object(self, repository: str, ref: str, path: str):
-        response = self._client.objects.statObject(
+        return self._client.objects.stat_object(
             repository=repository,
             ref=ref,
-            path=path).response()
-        return response.result
+            path=path)
 
 
 def get_filesystem(client: Client, repository: str, ref: str) -> PyFileSystem:
     return pyarrow_fs(client=client, repository=repository, ref=ref)
-
 
 
 LAKEFS_TYPE_NAME = 'lakefs'
@@ -206,7 +194,7 @@ class LakeFSFileSystem(FileSystemHandler):
     def get_file_info(self, paths_or_selector):
         if isinstance(paths_or_selector, str):
             return self._get_file_info(paths_or_selector)
-        return [self._get_file_info(p)for p in paths_or_selector]
+        return [self._get_file_info(p) for p in paths_or_selector]
 
     def normalize_path(self, path):
         return path
@@ -219,7 +207,7 @@ class LakeFSFileSystem(FileSystemHandler):
 
     def open_input_file(self, source: str, compression: str = 'detect', buffer_size: int = None) -> NativeFile:
         obj = self._client.get_object(self.repository, self.ref, source)
-        return BufferReader(obj)
+        return BufferReader(obj.read())
 
     def open_input_stream(self, source: str, compression: str = 'detect', buffer_size: int = None):
         pass
@@ -253,7 +241,7 @@ class LakeFSFileSystem(FileSystemHandler):
         # get file
         try:
             stat = self._client.stat_object(repository=self.repository, ref=self.ref, path=path)
-        except HTTPNotFound:
+        except NotFoundException:
             return get_file_info(path, FileType.NotFound)  # this doesn't exist!
         return get_file_info(path, FileType.File, stat.size_bytes, stat.mtime)
 

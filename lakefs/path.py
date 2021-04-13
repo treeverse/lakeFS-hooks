@@ -1,10 +1,8 @@
-
-
 DEFAULT_PATH_SEPARATOR = '/'
 DEFAULT_EXTENSION_SEPARATOR = '.'
 
-class Path:
 
+class Path:
     def __init__(self, v: str, separator: str = DEFAULT_PATH_SEPARATOR):
         self.path = v
         self.separator = separator
