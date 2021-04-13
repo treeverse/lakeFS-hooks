@@ -207,7 +207,7 @@ class LakeFSFileSystem(FileSystemHandler):
 
     def open_input_file(self, source: str, compression: str = 'detect', buffer_size: int = None) -> NativeFile:
         obj = self._client.get_object(self.repository, self.ref, source)
-        return BufferReader(obj)
+        return BufferReader(obj.read())
 
     def open_input_stream(self, source: str, compression: str = 'detect', buffer_size: int = None):
         pass
