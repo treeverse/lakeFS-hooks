@@ -5,10 +5,15 @@ from lakefs import formats
 
 from settings import LAKEFS_ACCESS_KEY_ID, LAKEFS_SECRET_ACCESS_KEY, LAKEFS_SERVER_ADDRESS
 
-import pyarrow.orc
 import pyarrow.parquet
 
 from flask import Flask, request, jsonify, send_file
+
+try:
+    import pyarrow.orc
+    has_orc = True
+except ImportError:
+    has_orc = False
 
 app = Flask(__name__)
 
@@ -91,7 +96,7 @@ def webhook_schema():
         if path.extension == 'parquet':
             schema = pyarrow.parquet.read_schema(fs.open_input_file(change.path))
         # Do the same for ORC files
-        elif path.extension == 'orc':
+        elif has_orc and path.extension == 'orc':
             orc_file = pyarrow.orc.ORCFile(fs.open_input_file(change.path))
             schema = orc_file.schema
         else:
