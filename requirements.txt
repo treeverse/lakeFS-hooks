@@ -1,3 +1,4 @@
-Flask==1.1.2
-pyarrow==3.0.0
-lakefs-client~=0.33.1
+Flask==2.2.2
+pyarrow==9.0.0
+lakefs-client~=0.81.1
+jinja2<3.1.2
