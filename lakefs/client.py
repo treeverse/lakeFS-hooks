@@ -71,8 +71,8 @@ class Client:
         while True:
             response = self._client.refs.diff_refs(
                 repository=repository,
-                left_ref=to_ref,
-                right_ref=from_ref,
+                left_ref=from_ref,
+                right_ref=to_ref,
                 after=after,
                 amount=prefetch_amount)
             for change in response.results:
