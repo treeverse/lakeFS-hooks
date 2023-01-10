@@ -6,9 +6,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        Hello Axolotl!
-        Thank you for contributing to the lakeFS project.
-        We appreciate the time you invest in filing a bug report and created this template to help make this process easier. It's really important to have all the information and context, to ensure we can properly address your issue. 
+        ## Hello Axolotl!
+        **Thank you for contributing to the lakeFS project.**
+        We appreciate the time you invest in filing a bug report and created this template to help make this process easier. 
+        It's really important to have all the information and context, to ensure we can properly address your issue. 
         Please use the following references to fill out the bug report.
   - type: input
     id: contact
