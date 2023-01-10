@@ -1,4 +1,4 @@
-name: Bug Report
+name: Bug Report v2
 description: File a bug report
 title: "[Bug]: "
 labels: ["bug", "contributor"]
@@ -46,7 +46,7 @@ body:
     id: deployment
     attributes:
       label: Deplyoment
-      description: Deployment type, for example: AWS ECS, Docker or Kubernetes, helm-chart, local
+      description: "Deployment type, for example: AWS ECS, Docker or Kubernetes, helm-chart, local"
     validations:
       required: true
   - type: input
