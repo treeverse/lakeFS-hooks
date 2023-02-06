@@ -1,11 +1,3 @@
----
-name: Pull Request
-about: Open a new pull request
-title: ''
-labels: contributor
-assignees: ''
-
----
 <!-- 
 Hello Axolotl!
 
